@@ -1,160 +1,292 @@
-= Template and instructions for the Eclipse Vert.x how-tos
+= Vert.x and Hibernate Reactive How-to
 :author: Julien Ponge <julien.ponge@gmail.com>
 :toc:
 
-This repository can be cloned and used as a basis for creating a new Eclipse Vert.x how-to.
-It especially contains the https://jekyllrb.com/[Jekyll] and continuous integration configurations for publishing a how-to as a web page.
+This how-to shows how to build a Vert.x service with http://hibernate.org/reactive/[Hibernate Reactive].
 
-== Conventions
+== What you will build
 
-Each how-to is a self-contained Git repository of the https://github.com/vertx-howtos[corresponding organisation on GitHub].
+- You will build a HTTP service that can list, fetch and record products.
+- Database access will be made using the http://hibernate.org/reactive/[Hibernate Reactive APIs] and a Vert.x reactive driver.
+- To simplify the experience the database will be started as a PostgreSQL container with https://www.testcontainers.org[TestContainers].
 
-The how-to document is written using the https://asciidoctor.org/docs/what-is-asciidoc/[Asciidoc] text format in a file called `README.adoc` at the root of the Git repository.
+== What you need
 
-The accompanying source code is directly at the root of the Git repository.
-For instance a Maven `pom.xml` is co-located with `README.adoc` at the root of the repository.
+- A text editor or IDE
+- Java 11 or higher
+- Apache Maven
+- Docker
+- HTTPie to make HTTP requests from the command-line
 
-Projects should preferably have both Maven and Gradle build descriptors.
-An author who doesn't have knowledge of either of the tools can always ask for contributions.
+== Create a project
 
-== Structure of a how-to
+Here is the content of the pom.xml file that you should be using:
 
-A how-to is not a guide or a mini-book: it must be as concise as possible.
+[source,xml,role="collapsed"]
+.`pom.xml`
+----
+include::pom.xml[]
+----
 
-In practice this means that each how-to must focus on a very narrow topic.
-It also means that the text must not deviate from the topic, and that the chosen example must be as simple as possible.
+The project uses https://github.com/smallrye/smallrye-reactive-utils[the Vert.x Mutiny bindings], so you will use https://smallrye.io/smallrye-mutiny/[Mutiny] to compose asynchronous operations.
 
-The structure of a how-to must be as follows.
+== Service implementation
 
-=== What you will build
+The service fits in 2 classes:
 
-- Explain the example scenario from a functional point of view.
-- Explain what the user can see when running the example.
-- Highlight the different pieces of code to be written and how they fit together.
+. `MainVerticle` contains the `main` method as well as the sole verticle, and
+. `Product` is an entity to be managed with Hibernate.
 
-=== What you need
+=== Product entity
 
-- List all required tools to edit, build and run the how-to.
-- Do not hesitate to point to third-party resources (e.g., if you need Docker, say why you need it and point to its installation documentation).
+Let's start with the `Product` entity.
+A _product_ has a primary key, a name and a price:
 
-=== Create a project
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/Product.java[]
+----
 
-- Explain how to create the project.
-- Show the Maven / Gradle build descriptors.
-- For any third-party tool (e.g., running a database with Docker), also have a subsection to explain this.
+=== Hibernate Reactive configuration
 
-=== Implementation sections
+The configuration of _Hibernate Reactive_ is not very different from _regular Hibernate_.
 
-- Make one or multiple sections to show the implementation.
-- Make use of Asciidoc source code comments to highlight specific parts of the code.
-- The code must be included using https://asciidoctor.org/docs/asciidoc-syntax-quick-reference/#source-code[Asciidoc directives]. Remember that you can include fragments of code by using delimiter tags.
+We need a `META-INF/persistence.xml` file as:
 
-=== Running the application
+[source,xml]
+----
+include::src/main/resources/META-INF/persistence.xml[]
+----
+<1> Specify the reactive provider
+<2> Make sure `Product` will be a managed entity
+<3> This is a JDBC-style URL, but be assured that it won't use JDBC!
 
-- Always show the various options to run the application.
+Hibernate Reactive selects the Vert.x reactive PostgreSQL driver because the `persistence.xml` file uses a PostgreSQL URL, and because `io.smallrye.reactive:smallrye-mutiny-vertx-pg-client` brings the driver implementation on the classpath.
 
-=== Summary
+=== Application startup
 
-- Briefly recapitulate what was covered and learned in the how-to.
+First of all, we start a PostgreSQL container with TestContainers in the `main` method, as in:
 
-=== See also
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=tc-start,indent=0]
+----
 
-- If possible, link to other how-tos.
-- If judicious, link to Vert.x or third-party documentation.
+Once the container is available, we can create a `Vertx` context and deploy `MainVerticle`:
 
-== How is the website being rendered?
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=vertx-start,indent=0]
+----
+<1> We need to pass the PostgreSQL port that is mapped outside the container
+<2> Because we are using Mutiny, we need to subscribe to the deployment operation and actually trigger it, otherwise nothing happens
 
-The website is being rendered using Jekyll and the Asciidoctor extension for Jekyll.
+=== Verticle setup
 
-There is a https://github.com/vertx-howtos/vertx-howtos-jekyll-theme[Jekyll theme] published as a Ruby Gem, so every how-to uses a common theme.
+The verticle in class `MainVerticle` uses the Mutiny bindings, so there is a Mutiny-friendly method to define the start behavior.
+This method call `asyncStart` returns a `Uni<Void>`:
 
-=== Asciidoctor attributes
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=preamble,indent=0]
+----
+<1> This is the Hibernate Reactive session factory with a Mutiny-based API
 
-The common theme depends on the following attributes to be set right below the title header:
+The `asyncStart` method needs to complete 2 operations:
+
+1. create an Hibernate Reactive session factory connected to the PostgreSQL database, and
+2. start a HTTP server.
+
+We can do these operations in parallel rather than in sequence.
+
+The session factory is created using the following code, where we override the "JDBC" URL with the PostgreSQL port since it it dynamically allocated.
+Also note that creating session factory is a blocking operation, so we offload it to a work thread.
+
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=hr-start,indent=0]
+----
+<1> Override the PostgreSQL port
+<2> Offload to a worker thread
+
+The HTTP API is defined using 3 routes: 1 to get all products, 1 to get a specific product, and 1 to create / record a new product:
+
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=routing,indent=0]
+----
+
+We can finally start the HTTP server then await for Hibernate Reactive to be ready:
+
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=async-start,indent=0]
+----
+<1> Join the 2 asynchronous operations, then discard the values and return a `Void` value, hence `Uni<Void>`
+
+Once the 2 operations have completed then the `asyncStart` method reports that the verticle deployment has completed.
+
+=== Request handling methods
+
+The methods to handle HTTP requests use Hibernate Reactive for database access:
+
+[source,java]
+----
+include::src/main/java/io/vertx/howtos/hr/MainVerticle.java[tags=crud-methods,indent=0]
+----
+These are standard Hibernate operations (e.g., `persist`, `flush`, `find`) chained using Mutiny operators (e.g., `chain`, `onItem`, `replaceWith`).
+
+== Running the application
+
+The application is self-contained as it starts a PostgreSQL container.
+You can use Maven to compile and run the application:
 
 [source,text]
 ----
-= My awesome how-to
-:page-permalink: /
-:page-github: vertx-howtos/my-howto
+$ mvn compile exec:java
 ----
 
-The `page-permalink` attribute ensures that `README.adoc` is rendered as `index.html` rather than `README.adoc`.
+The logs should be similar to:
 
-The `page-github` attribute must contain the joint GitHub organization and repository so it can properly link to the GitHub repository, provide a direct edition link, and more.
-
-=== Jekyll configuration
-
-The Jekyll configuration shall not have to be tweaked much, here is the basic configuration that we use:
-
-[source,yaml]
+[source,text]
 ----
-include::_config.yml[]
+[INFO] --- exec-maven-plugin:3.0.0:java (default-cli) @ hibernate-reactive-howto ---
+2021-05-18 13:54:35,570 INFO [io.vertx.howtos.hr.MainVerticle.main()] io.vertx.howtos.hr.MainVerticle - 🚀 Starting a PostgreSQL container
+2021-05-18 13:54:39,430 DEBUG [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Starting container: postgres:11-alpine
+2021-05-18 13:54:39,431 DEBUG [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Trying to start container: postgres:11-alpine (attempt 1/1)
+2021-05-18 13:54:39,432 DEBUG [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Starting container: postgres:11-alpine
+2021-05-18 13:54:39,432 INFO [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Creating container for image: postgres:11-alpine
+2021-05-18 13:54:40,016 INFO [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Starting container with ID: f538f59149d72ebec87382b09624240ca2faddcbc9c247a53575a537d1d7f045
+2021-05-18 13:54:42,050 INFO [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Container postgres:11-alpine is starting: f538f59149d72ebec87382b09624240ca2faddcbc9c247a53575a537d1d7f045
+2021-05-18 13:54:43,918 INFO [io.vertx.howtos.hr.MainVerticle.main()] 🐳 [postgres:11-alpine] - Container postgres:11-alpine started in PT4.510869S
+2021-05-18 13:54:43,918 INFO [io.vertx.howtos.hr.MainVerticle.main()] io.vertx.howtos.hr.MainVerticle - 🚀 Starting Vert.x
+2021-05-18 13:54:44,342 INFO [vert.x-worker-thread-0] org.hibernate.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: pg-demo]
+2021-05-18 13:54:44,408 INFO [vert.x-worker-thread-0] org.hibernate.Version - HHH000412: Hibernate ORM core version 5.4.31.Final
+2021-05-18 13:54:44,581 INFO [vert.x-eventloop-thread-0] io.vertx.howtos.hr.MainVerticle - ✅ HTTP server listening on port 8080
+2021-05-18 13:54:44,586 INFO [vert.x-worker-thread-0] org.hibernate.annotations.common.Version - HCANN000001: Hibernate Commons Annotations {5.1.2.Final}
+2021-05-18 13:54:44,775 INFO [vert.x-worker-thread-0] org.hibernate.dialect.Dialect - HHH000400: Using dialect: org.hibernate.dialect.PostgreSQL10Dialect
+2021-05-18 13:54:45,006 INFO [vert.x-worker-thread-0] o.h.reactive.provider.impl.ReactiveIntegrator - HRX000001: Hibernate Reactive Preview
+2021-05-18 13:54:45,338 INFO [vert.x-worker-thread-0] o.h.reactive.pool.impl.DefaultSqlClientPool - HRX000011: SQL Client URL [jdbc:postgresql://localhost:55019/postgres]
+2021-05-18 13:54:45,342 WARN [vert.x-worker-thread-0] io.vertx.core.impl.VertxImpl - You're already on a Vert.x context, are you sure you want to create a new Vertx instance?
+2021-05-18 13:54:45,345 INFO [vert.x-worker-thread-0] o.h.reactive.pool.impl.DefaultSqlClientPool - HRX000012: Connection pool size: 10
+[Hibernate]
+    drop table if exists Product cascade
+2021-05-18 13:54:45,521 WARN [vert.x-eventloop-thread-0] io.vertx.sqlclient.impl.SocketConnectionBase - Backend notice: severity='NOTICE', code='00000', message='table "product" does not exist, skipping', detail='null', hint='null', position='null', internalPosition='null', internalQuery='null', where='null', file='tablecmds.c', line='1060', routine='DropErrorMsgNonExistent', schema='null', table='null', column='null', dataType='null', constraint='null'
+[Hibernate]
+    drop sequence if exists hibernate_sequence
+2021-05-18 13:54:45,527 WARN [vert.x-eventloop-thread-0] io.vertx.sqlclient.impl.SocketConnectionBase - Backend notice: severity='NOTICE', code='00000', message='sequence "hibernate_sequence" does not exist, skipping', detail='null', hint='null', position='null', internalPosition='null', internalQuery='null', where='null', file='tablecmds.c', line='1060', routine='DropErrorMsgNonExistent', schema='null', table='null', column='null', dataType='null', constraint='null'
+[Hibernate]
+    drop table if exists Product cascade
+2021-05-18 13:54:45,537 WARN [vert.x-eventloop-thread-0] io.vertx.sqlclient.impl.SocketConnectionBase - Backend notice: severity='NOTICE', code='00000', message='table "product" does not exist, skipping', detail='null', hint='null', position='null', internalPosition='null', internalQuery='null', where='null', file='tablecmds.c', line='1060', routine='DropErrorMsgNonExistent', schema='null', table='null', column='null', dataType='null', constraint='null'
+[Hibernate]
+    drop sequence if exists hibernate_sequence
+2021-05-18 13:54:45,540 WARN [vert.x-eventloop-thread-0] io.vertx.sqlclient.impl.SocketConnectionBase - Backend notice: severity='NOTICE', code='00000', message='sequence "hibernate_sequence" does not exist, skipping', detail='null', hint='null', position='null', internalPosition='null', internalQuery='null', where='null', file='tablecmds.c', line='1060', routine='DropErrorMsgNonExistent', schema='null', table='null', column='null', dataType='null', constraint='null'
+[Hibernate]
+    create sequence hibernate_sequence start 1 increment 1
+[Hibernate]
+    create table Product (
+       id int8 not null,
+        name varchar(255),
+        price numeric(19, 2) not null,
+        primary key (id)
+    )
+[Hibernate]
+    alter table if exists Product
+       add constraint UK_gxubutkbk5o2a6aakbe7q9kww unique (name)
+2021-05-18 13:54:45,574 INFO [vert.x-eventloop-thread-0] io.vertx.howtos.hr.MainVerticle - ✅ Hibernate Reactive is ready
+2021-05-18 13:54:45,576 INFO [vert.x-eventloop-thread-1] io.vertx.howtos.hr.MainVerticle - ✅ Deployment success
+2021-05-18 13:54:45,576 INFO [vert.x-eventloop-thread-1] io.vertx.howtos.hr.MainVerticle - 💡 PostgreSQL container started in 8349ms
+2021-05-18 13:54:45,576 INFO [vert.x-eventloop-thread-1] io.vertx.howtos.hr.MainVerticle - 💡 Vert.x app started in 1658ms
 ----
 
-TIP: When running Jekyll, check the content of the `_site/` folder and adapt the `exclude` items to avoid pushing unnecessary content to the website.
+We can insert products:
 
-=== Ruby environment
-
-It is strongly recommended to use either https://github.com/rbenv/rbenv[rbenv] or https://rvm.io/[RVM] for your Ruby installation.
-
-You will need https://bundler.io/[Bundler] to install all required dependencies:
-
+[source,text]
 ----
-$ gem install bundler
-----
+$ http :8080/products name="Baguette" price="1.20"
+HTTP/1.1 200 OK
+content-length: 39
+content-type: application/json; charset=utf-8
 
-You can then let _Bundler_ do the installation work:
+{
+    "id": 1,
+    "name": "Baguette",
+    "price": 1.2
+}
 
-----
-$ bundle install
-----
+$ http :8080/products name="Pain" price="1.40"
+HTTP/1.1 200 OK
+content-length: 35
+content-type: application/json; charset=utf-8
 
-From time to time you may also update dependencies:
-
-----
-$ bundle update
-----
-
-The dependencies are specified in the `Gemfile` file:
-
-[source,ruby]
-----
-include::Gemfile[]
+{
+    "id": 2,
+    "name": "Pain",
+    "price": 1.4
+}
 ----
 
-TIP: Keep the `vertx-howtos-jekyll-theme` dependency up-to-date!
+We can also list a specific product:
 
-=== Running Jekyll
-
-You can run Jekyll with a full auto-reload experience:
-
+[source,text]
 ----
-$ bundle exec jekyll server --watch --livereload
+$ http :8080/products/1
+HTTP/1.1 200 OK
+content-length: 39
+content-type: application/json; charset=utf-8
+
+{
+    "id": 1,
+    "name": "Baguette",
+    "price": 1.2
+}
 ----
 
-== How is the website being published?
+And we can of course list all products:
 
-The content first needs to be rendered by Jekyll, then the resulting web site files are being pushed to the repository `gh-pages` branch.
-GitHub pages then exposes the content of the `gh-pages` branch as the website.
+[source,text]
+----
+$ http :8080/products
+HTTP/1.1 200 OK
+content-length: 77
+content-type: application/json; charset=utf-8
 
-While you could do this manually, we automate the process with GitHub Actions.
-Pushing to the `master` branch triggers a deployment, and a daily cron job is in place.
+[
+    {
+        "id": 1,
+        "name": "Baguette",
+        "price": 1.2
+    },
+    {
+        "id": 2,
+        "name": "Pain",
+        "price": 1.4
+    }
+]
+----
 
-== Misc
+Since we enabled Hibernate SQL logging, the application logs show the requests being executed such as:
 
-=== Code style
+[source,text]
+----
+[Hibernate]
+    select
+        product0_.id as id1_0_0_,
+        product0_.name as name2_0_0_,
+        product0_.price as price3_0_0_
+    from
+        Product product0_
+    where
+        product0_.id=$1
+----
 
-There is a `.editorconfig` file in this template repository with the 2-space indentation style that we prefer in Vert.x.
+== Summary
 
-In any case, favour readability in samples:
+- We built a Vert.x service with a HTTP API that accesses a database using a Vert.x reactive driver and Hibernate Reactive.
+- We used the familiar _object-relational mapping_ programming model while still having end-to-end reactive requests processing.
+- TestContainers can be used to easily assemble self-contained demo applications.
 
-- do not hesitate to use blank lines,
-- do not over-engineer,
-- use explicit short private methods rather than complicated lambdas expressions.
+== See also
 
-=== Asciidoc style
-
-Asciidoc does not enforce any style.
-
-We recommended that you follow the https://asciidoctor.org/docs/asciidoc-recommended-practices/[Asciidoctor recommended practices], and especially the https://asciidoctor.org/docs/asciidoc-recommended-practices/#one-sentence-per-line["One sentence per line"] rule.
+- https://github.com/hibernate/hibernate-reactive[Hibernate Reactive]
+- https://smallrye.io/smallrye-mutiny/[Mutiny]
