@@ -5,6 +5,7 @@ echo "⚙️  Building with Jekyll"
 gem install bundler
 bundle install
 bundle exec jekyll build
+mv _site/README.html _site/index.html || true
 
 echo "⚙️  Copying the files"
 rm -rf _gh_pages/*
