@@ -82,7 +82,7 @@
 <p>You will build a HTTP service that can list, fetch and record products.</p>
 </li>
 <li>
-<p>Database access will be made using the <a href="http://hibernate.org/reactive/">Hibernate Reactive APIs</a> and a Vert.x reactive driver.</p>
+<p>Database access will be made using the <a href="http://hibernate.org/reactive/">Hibernate Reactive APIs</a> and a <a href="https://vertx.io/docs/vertx-pg-client/java/">Reactive Vert.x SQL Client</a>.</p>
 </li>
 <li>
 <p>To simplify the experience the database will be started as a PostgreSQL container with <a href="https://www.testcontainers.org">TestContainers</a>.</p>
@@ -441,7 +441,7 @@ This method call <code>asyncStart</code> returns a <code>Uni&lt;Void&gt;</code>:
 </ol>
 </div>
 <div class="paragraph">
-<p>We can do these operations in parallel rather than in sequence.</p>
+<p>We can do these operations simultaneously rather than in sequence.</p>
 </div>
 <div class="paragraph">
 <p>The session factory is created using the following code, where we override the "JDBC" URL with the PostgreSQL port since it it dynamically allocated.
@@ -837,7 +837,7 @@ content-type: application/json; charset=utf-8
   <div class="row">
     <div class="col">
       <hr>
-      <p><small>Last published: 2021-05-26 01:40:56 +0000.</small></p>
+      <p><small>Last published: 2021-05-26 10:58:38 +0000.</small></p>
     </div>
   </div>
 </div>
