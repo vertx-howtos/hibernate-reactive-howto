@@ -1,6 +1,10 @@
 = Vert.x and Hibernate Reactive How-to
-:author: Julien Ponge <julien.ponge@gmail.com>
-:toc:
+:page-permalink: /
+:page-github: vertx-howtos/hibernate-reactive-howto
+
+ifdef::env-github[]
+image:https://github.com/vertx-howtos/hibernate-reactive-howto/workflows/Publish%20the%20how-to/badge.svg["Build Status", link="https://github.com/vertx-howtos/hibernate-reactive-howto/actions?query=workflow%3A%22Publish+the+how-to%22"]
+endif::env-github[]
 
 This how-to shows how to build a Vert.x service with http://hibernate.org/reactive/[Hibernate Reactive].
 
