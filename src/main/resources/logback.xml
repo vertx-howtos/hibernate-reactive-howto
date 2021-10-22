@@ -11,6 +11,7 @@
   <logger name="org.hibernate" level="info"/>
   <logger name="org.jboss.logging" level="info"/>
   <logger name="org.testcontainers" level="warn"/>
+  <logger name="com.github.dockerjava" level="warn"/>
 
   <root level="debug">
     <appender-ref ref="STDOUT"/>
