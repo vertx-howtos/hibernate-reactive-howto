@@ -83,7 +83,7 @@ public class MainVerticle extends AbstractVerticle {
     Product product = ctx.getBodyAsJson().mapTo(Product.class);
     return emf.withSession(session -> session.
       persist(product)
-      .chain(session::flush)
+      .call(session::flush)
       .replaceWith(product));
   }
   // end::crud-methods[]
