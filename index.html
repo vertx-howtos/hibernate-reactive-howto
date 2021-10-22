@@ -29,11 +29,11 @@
         <a class="nav-link" href="https://vertx.io/docs/"><i class="fas fa-lg fa-drafting-compass"></i> Vert.x docs</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="https://github.com/"><i class="fab fa-lg fa-github"></i> Source
+        <a class="nav-link" href="https://github.com/vertx-howtos/hibernate-reactive-howto"><i class="fab fa-lg fa-github"></i> Source
           code</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="https://github.com//edit/master/README.adoc"><i
+        <a class="nav-link" href="https://github.com/vertx-howtos/hibernate-reactive-howto/edit/master/README.adoc"><i
             class="far fa-lg fa-edit"></i>
           Edit this</a>
       </li>
@@ -46,27 +46,7 @@
   <div class="row">
     <div class="col">
       <h1>Vert.x and Hibernate Reactive How-to</h1>
-      <div id="toc" class="toc">
-<div id="toctitle">Table of Contents</div>
-<ul class="sectlevel1">
-<li><a href="#what-you-will-build">What you will build</a></li>
-<li><a href="#what-you-need">What you need</a></li>
-<li><a href="#create-a-project">Create a project</a></li>
-<li><a href="#service-implementation">Service implementation</a>
-<ul class="sectlevel2">
-<li><a href="#product-entity">Product entity</a></li>
-<li><a href="#hibernate-reactive-configuration">Hibernate Reactive configuration</a></li>
-<li><a href="#application-startup">Application startup</a></li>
-<li><a href="#verticle-setup">Verticle setup</a></li>
-<li><a href="#request-handling-methods">Request handling methods</a></li>
-</ul>
-</li>
-<li><a href="#running-the-application">Running the application</a></li>
-<li><a href="#summary">Summary</a></li>
-<li><a href="#see-also">See also</a></li>
-</ul>
-</div>
-<div id="preamble">
+      <div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
 <p>This how-to shows how to build a Vert.x service with <a href="http://hibernate.org/reactive/">Hibernate Reactive</a>.</p>
@@ -537,7 +517,7 @@ Also note that creating session factory is a blocking operation, so we offload i
   <span style="color: #445588;font-weight: bold">Product</span> <span style="background-color: #f8f8f8">product</span> <span style="color: #000000;font-weight: bold">=</span> <span style="background-color: #f8f8f8">ctx</span><span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">getBodyAsJson</span><span style="color: #000000;font-weight: bold">().</span><span style="color: #008080">mapTo</span><span style="color: #000000;font-weight: bold">(</span><span style="color: #445588;font-weight: bold">Product</span><span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">class</span><span style="color: #000000;font-weight: bold">);</span>
   <span style="color: #000000;font-weight: bold">return</span> <span style="background-color: #f8f8f8">emf</span><span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">withSession</span><span style="color: #000000;font-weight: bold">(</span><span style="background-color: #f8f8f8">session</span> <span style="color: #000000;font-weight: bold">-&gt;</span> <span style="background-color: #f8f8f8">session</span><span style="color: #000000;font-weight: bold">.</span>
     <span style="color: #990000;font-weight: bold">persist</span><span style="color: #000000;font-weight: bold">(</span><span style="background-color: #f8f8f8">product</span><span style="color: #000000;font-weight: bold">)</span>
-    <span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">chain</span><span style="color: #000000;font-weight: bold">(</span><span style="color: #990000;font-weight: bold">session:</span><span style="color: #000000;font-weight: bold">:</span><span style="background-color: #f8f8f8">flush</span><span style="color: #000000;font-weight: bold">)</span>
+    <span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">call</span><span style="color: #000000;font-weight: bold">(</span><span style="color: #990000;font-weight: bold">session:</span><span style="color: #000000;font-weight: bold">:</span><span style="background-color: #f8f8f8">flush</span><span style="color: #000000;font-weight: bold">)</span>
     <span style="color: #000000;font-weight: bold">.</span><span style="color: #008080">replaceWith</span><span style="color: #000000;font-weight: bold">(</span><span style="background-color: #f8f8f8">product</span><span style="color: #000000;font-weight: bold">));</span>
 <span style="color: #000000;font-weight: bold">}</span></code></pre>
 </div>
@@ -837,7 +817,7 @@ content-type: application/json; charset=utf-8
   <div class="row">
     <div class="col">
       <hr>
-      <p><small>Last published: 2021-09-19 01:11:40 +0000.</small></p>
+      <p><small>Last published: 2021-10-22 15:34:45 +0000.</small></p>
     </div>
   </div>
 </div>
