@@ -57,7 +57,7 @@ public class MainVerticle extends AbstractVerticle {
 
     // tag::async-start[]
     Uni<HttpServer> startHttpServer = vertx.createHttpServer()
-      .requestHandler(router::handle)
+      .requestHandler(router)
       .listen(8080)
       .onItem().invoke(() -> logger.info("✅ HTTP server listening on port 8080"));
 
@@ -80,7 +80,7 @@ public class MainVerticle extends AbstractVerticle {
   }
 
   private Uni<Product> createProduct(RoutingContext ctx) {
-    Product product = ctx.getBodyAsJson().mapTo(Product.class);
+    Product product = ctx.body().asPojo(Product.class);
     return emf.withSession(session -> session.
       persist(product)
       .call(session::flush)

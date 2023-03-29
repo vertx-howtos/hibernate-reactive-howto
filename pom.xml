@@ -10,51 +10,60 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
-    <exec-maven-plugin.version>3.0.0</exec-maven-plugin.version>
     <main.verticle>io.vertx.howtos.hr.MainVerticle</main.verticle>
-    <mutiny-vertx.version>2.14.2</mutiny-vertx.version>
-    <hibernate-reactive-core.version>1.0.0.Final</hibernate-reactive-core.version>
-    <logback-classic.version>1.2.6</logback-classic.version>
-    <testcontainers.version>1.16.0</testcontainers.version>
-    <jackson-databind.version>2.13.0</jackson-databind.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>io.vertx</groupId>
+        <artifactId>vertx-stack-depchain</artifactId>
+        <version>4.3.7</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>io.smallrye.reactive</groupId>
+        <artifactId>vertx-mutiny-clients-bom</artifactId>
+        <version>3.2.0</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>io.smallrye.reactive</groupId>
       <artifactId>smallrye-mutiny-vertx-core</artifactId>
-      <version>${mutiny-vertx.version}</version>
     </dependency>
     <dependency>
       <groupId>io.smallrye.reactive</groupId>
       <artifactId>smallrye-mutiny-vertx-web</artifactId>
-      <version>${mutiny-vertx.version}</version>
     </dependency>
     <dependency>
       <groupId>io.smallrye.reactive</groupId>
       <artifactId>smallrye-mutiny-vertx-pg-client</artifactId>
-      <version>${mutiny-vertx.version}</version>
     </dependency>
     <dependency>
       <groupId>org.hibernate.reactive</groupId>
       <artifactId>hibernate-reactive-core</artifactId>
-      <version>${hibernate-reactive-core.version}</version>
+      <version>1.1.9.Final</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>${jackson-databind.version}</version>
+      <version>2.14.2</version>
     </dependency>
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>${logback-classic.version}</version>
+      <version>1.4.6</version>
     </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>postgresql</artifactId>
-      <version>${testcontainers.version}</version>
+      <version>1.17.6</version>
     </dependency>
   </dependencies>
 
@@ -63,7 +72,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>${maven-compiler-plugin.version}</version>
+        <version>3.10.1</version>
         <configuration>
           <release>11</release>
         </configuration>
@@ -71,7 +80,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
-        <version>${exec-maven-plugin.version}</version>
+        <version>3.0.0</version>
         <configuration>
           <mainClass>${main.verticle}</mainClass>
         </configuration>
