@@ -2,4 +2,3 @@
 set -e
 
 mvn clean install
-#./gradlew build
